@@ -3,6 +3,8 @@ pragma solidity 0.8.18;
 
 import {BaseStrategy, ERC20} from "@tokenized-strategy/BaseStrategy.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ICurveFi } from "../src/interfaces/curve/curve.sol";
+import { ConvexRewardPool, Booster } from "../src/interfaces/convex/convex.sol";
 
 // Import interfaces for many popular DeFi projects, or add your own!
 //import "../interfaces/<protocol>/<Interface>.sol";
@@ -23,10 +25,19 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 contract Strategy is BaseStrategy {
     using SafeERC20 for ERC20;
 
+    address public constant crv = 0x172370d5Cd63279eFa6d502DAB29171933a610AF;
+    address public constant lptoken = 0xA73EdCf18421B56D9AF1cE08A34E102E23b2C4B6;
+    ICurveFi public constant pool = ICurveFi(0xc7c939A474CB10EB837894D1ed1a77C61B268Fa7);
+    Booster public constant booster = Booster(0xF403C135812408BFbE8713b5A23a04b3D48AAE31);
+    ConvexRewardPool public constant convex = ConvexRewardPool(0xA9249f8667cb120F065D9dA1dCb37AD28E1E8FF0);
+
     constructor(
         address _asset,
         string memory _name
-    ) BaseStrategy(_asset, _name) {}
+    ) BaseStrategy(_asset, _name) {
+        ERC20(crv).approve(address(pool), type(uint256).max);
+        ERC20(asset).approve(address(booster), type(uint256).max);
+    }
 
     /*//////////////////////////////////////////////////////////////
                 NEEDED TO BE OVERRIDDEN BY STRATEGIST
@@ -47,6 +58,7 @@ contract Strategy is BaseStrategy {
         // TODO: implement deposit logic EX:
         //
         //      lendingPool.deposit(address(asset), _amount ,0);
+        booster.depositAll(8);
     }
 
     /**
@@ -74,6 +86,7 @@ contract Strategy is BaseStrategy {
         // TODO: implement withdraw logic EX:
         //
         //      lendingPool.withdraw(address(asset), _amount);
+        convex.withdraw(_amount, true);
     }
 
     /**
@@ -102,15 +115,14 @@ contract Strategy is BaseStrategy {
         internal
         override
         returns (uint256 _totalAssets)
-    {
-        // TODO: Implement harvesting logic and accurate accounting EX:
-        //
-        //      if(!TokenizedStrategy.isShutdown()) {
-        //          _claimAndSellRewards();
-        //      }
-        //      _totalAssets = aToken.balanceOf(address(this)) + asset.balanceOf(address(this));
-        //
-        _totalAssets = asset.balanceOf(address(this));
+    {   
+        convex.getReward(address(this));
+        if (!TokenizedStrategy.isShutdown()) {
+            uint256 crv_bal = ERC20(crv).balanceOf(address(this));
+
+            pool.add_liquidity([crv_bal, 0], 0);
+        }
+        _totalAssets = ERC20(asset).balanceOf(address(this)) + convex.balanceOf(address(this));
     }
 
     /*//////////////////////////////////////////////////////////////
