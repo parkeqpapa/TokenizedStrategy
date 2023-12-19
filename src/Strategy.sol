@@ -58,7 +58,7 @@ contract Strategy is BaseStrategy {
         // TODO: implement deposit logic EX:
         //
         //      lendingPool.deposit(address(asset), _amount ,0);
-        booster.depositAll(8);
+        booster.deposit(8, _amount);
     }
 
     /**
@@ -86,7 +86,7 @@ contract Strategy is BaseStrategy {
         // TODO: implement withdraw logic EX:
         //
         //      lendingPool.withdraw(address(asset), _amount);
-        convex.withdraw(_amount, true);
+        convex.withdraw(_amount, false);
     }
 
     /**
